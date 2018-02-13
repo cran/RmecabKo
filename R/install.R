@@ -36,11 +36,31 @@ install_mecab <- function(mecabLocation) {
     stop("Please speficy the path to install Mecab-Ko library.")
   }
   
-  mecabLocCreated <- dir.create(mecabLocation, showWarnings = FALSE)
+  dir.create(mecabLocation, recursive = TRUE, showWarnings = FALSE)
   
-  if (!mecabLocCreated) {
-    stop(paste("Unable to make a new directory to", mecabLocation, sep = " "))
+  if (file.exists(file.path(mecabLocation, "mecab.exe"))) {
+    
+    mecabLibsLoc <- file.path(system.file(package = "RmecabKo"), "mecabLibs")
+    
+    if(!file.exists(mecabLibsLoc)) {
+      con <- file(mecabLibsLoc, "a")
+      
+      tryCatch({
+        cat(mecabLocation, file=con, sep="\n")
+      },
+      finally = {
+        close(con)
+      })
+    }
+    
+    options(list(mecab.libpath = mecabLocation))
+    
+    stop("Mecab is already existed. The package will use the binary in this location.")
   }
+    
+  #if (!mecabLocCreated) {
+  #  stop(paste("Unable to create a new directory to", mecabLocation, sep = " "))
+  #}
   
   # verify 64-bit
   # mecab-ko-msvc: https://github.com/Pusnow/mecab-ko-msvc
@@ -83,7 +103,7 @@ install_mecab <- function(mecabLocation) {
   
   cat("Install mecab-ko-dic-msvc...")
   
-  mecabDicDist <- "https://github.com/Pusnow/mecab-ko-dic-msvc/releases/download/mecab-ko-dic-2.0.1-20150920-msvc/mecab-ko-dic-msvc.zip"
+  mecabDicDist <- "https://github.com/Pusnow/mecab-ko-dic-msvc/releases/download/mecab-ko-dic-2.0.3-20170922-msvc/mecab-ko-dic-msvc.zip"
   mecabDicDest <- file.path(mecabLocation, "mecab_dic.zip")
   
   suppressWarnings(download.file(url=mecabDicDist, destfile=mecabDicDest, method=method))

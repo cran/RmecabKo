@@ -8,18 +8,20 @@
 #' This is a basic function of part-of-speech tagging by mecab-ko.
 #'
 #' @param phrase Character vector.
-#' @return List of POS tagged morpheme will be returned. Element name of the list are original phrases.
+#' @param join Boolean.
+#' @return List of POS tagged morpheme will be returned in conjoined character vecter form. Element name of the list are original phrases. If \code{join=FALSE}, it returns list of morpheme with named with tags.
 #'
 #' See examples in \href{https://github.com/junhewk/RmecabKo}{Github}.
 #' 
 #' @examples 
 #' \dontrun{
 #' pos(c("Some Korean Phrases"))
+#' pos(c("Some Korean Phrases"), join=FALSE)
 #' }
 #' 
+#' @importFrom utils localeToCharset
 #' @export
-
-pos <- function(phrase) {
+pos <- function(phrase, join = TRUE) {
   if (typeof(phrase) != "character") {
     stop("'phrase' must be a character vector")
   }
@@ -35,7 +37,7 @@ pos <- function(phrase) {
 		}
 
 		# Rcpp function to tagging
-  	tagged <- posRcpp(phrase, dicpath)
+  	tagged <- posRcpp(phrase, dicpath, join)
 		
 	} else if(is_windows()) {
     
@@ -54,14 +56,14 @@ pos <- function(phrase) {
 		# saving phrase to UTF-8 txt file
 		phraseFile <- utils::shortPathName(tempfile())
 
-		con <- file(phraseFile, "a")
-  	tryCatch({
-    	cat(iconv(phrase, to="UTF-8"), file=con, sep="\n")
-  	},
-  	finally = {
-    	close(con)
-  	})
-
+		con <- file(phraseFile, "a", encoding = "UTF-8")
+		tryCatch({
+		  cat(iconv(phrase, from = utils::localeToCharset()[1], to = "UTF-8"), file=con, sep="\n")
+		},
+		finally = {
+		  close(con)
+		})
+		
   	outputFile <- utils::shortPathName(tempfile())
   	
   	mecabOption <- c("-r", mecabKoRc, "-d", mecabKoDic, "-o", outputFile, phraseFile)
@@ -75,22 +77,30 @@ pos <- function(phrase) {
   	
   	i <- 1
   	tagged <- list()
-  	taggedLine <- c()
+  	length(tagged) <- i
   	
-    for(posLine in posResult) {
-      if(posLine=="EOS") {
-        if(is.null(taggedLine)) {
-          length(tagged) <- i
-        } else {
-          tagged[[i]] <- taggedLine
-        }
+    for(line in seq(1, length(posResult), 1)) {
+      
+      taggedLine <- c()
+      
+      if(posResult[line] == "EOS") {
         i <- i + 1
-        taggedLine <- c()
-      } else if(substring(posLine, 1, 1) == ",") {
-        taggedLine <- c(taggedLine, ",/SC")
+        if (line != length(posResult)) length(tagged) <-  i
+      } else if(substring(posResult[line], 1, 1) == ",") {
+        if (join) {
+          taggedLine <- c(taggedLine, ",/SC")  
+        } else {
+          taggedLine["SC"] = ","
+        }
       } else {
-        taggedElements <- strsplit(posLine, ",")
-        taggedLine <- c(taggedLine, gsub("\t", "/", taggedElements[[1]][1]))
+        taggedElements <- strsplit(posResult[line], ",")
+        if (join) {
+          taggedLine <- c(taggedLine, gsub("\t", "/", taggedElements[[1]][1]))
+        } else {
+          taggedMorpheme <- strsplit(taggedElements[[1]][1], "\t")
+          taggedLine[taggedMorpheme[[1]][2]] <- taggedMorpheme[[1]][1]
+        }
+        tagged[[i]] <- c(tagged[[i]], taggedLine)
       }
     }
   	
@@ -98,5 +108,6 @@ pos <- function(phrase) {
   	suppressWarnings(file.remove(outputFile))
 	} 
   names(tagged) <- phrase
+  
   return(tagged)
 }
